@@ -2,7 +2,7 @@
 
 ## Zweck
 
-Das Projekt steuert eine dreifarbige Ampel mit einem PIR-Bewegungssensor. Ein AM2302/DHT22 misst zusätzlich Temperatur und relative Luftfeuchtigkeit. Der ESP32 stellt ein eigenes WLAN bereit und zeigt den aktuellen Anlagenstatus auf einer lokalen Webseite an.
+Das Projekt steuert eine dreifarbige Ampel mit einem PIR-Bewegungssensor. Ein AM2302/DHT22 misst zusätzlich Temperatur und relative Luftfeuchtigkeit. Der ESP32 verbindet sich mit dem Heim-WLAN und zeigt den aktuellen Anlagenstatus auf einer lokalen Webseite an.
 
 Der Zugangspunkt bietet keinen Internetzugang. Der ESP32 stellt Livewerte bereit. Ein optionaler PC-Logger speichert diese regelmäßig in einer SQLite-Datenbank im Projektordner.
 
@@ -38,19 +38,9 @@ Bei einem nackten DHT22-Sensor ist zwischen DATA und 3V3 üblicherweise ein Pull
 
 ## WLAN und Webseite
 
-Standardzugangspunkt:
+Beim ersten Einrichten `include/config.example.h` als `include/config.h` kopieren und dort `WIFI_SSID` und `WIFI_PASSWORD` durch den Namen und das Passwort des Heim-WLANs ersetzen. `include/config.h` wird von Git ignoriert; die Vorlage enthält keine echten Zugangsdaten. Der ESP32 benötigt ein 2,4-GHz-WLAN. Nach dem Start zeigt der serielle Monitor mit 115200 Baud die vom Router zugewiesene IP-Adresse und die Webseitenadresse an. Ein Gerät im selben Heimnetz kann die Seite unter `http://<ESP32-IP>/` öffnen. Eine DHCP-Reservierung im Router hält die IP-Adresse gleich.
 
-| Einstellung | Wert |
-| --- | --- |
-| WLAN-Name | `Ampel-Sensor` |
-| WLAN-Passwort | `Ampel-Setup-2026` |
-| ESP32-Adresse | `192.168.4.1` |
-| Webseite | `http://192.168.4.1/` |
-| Status-API | `http://192.168.4.1/api/status` |
-
-WLAN-Name und Passwort sind in `include/config.h` definiert. Das Passwort muss mindestens acht Zeichen lang sein. Vor einer Nutzung außerhalb eines geschützten Tests das Standardpasswort ändern. Die Verbindung verwendet kein TLS und ist nur für ein lokales, vertrauenswürdiges Testnetz vorgesehen.
-
-Zum Öffnen der Webseite und zum Speichern der Daten den PC mit dem WLAN `Ampel-Sensor` verbinden. Danach im Browser `http://192.168.4.1/` öffnen. Das WLAN hat absichtlich keinen Internetzugang. Falls Windows fragt, ob es trotzdem verbunden bleiben soll, die Verbindung beibehalten.
+Der Webserver verwendet unverschlüsseltes HTTP und hat keine Anmeldung. Er ist für den Zugriff im vertrauenswürdigen Heimnetz gedacht. Für Zugriff von unterwegs ein VPN zum Heimnetz verwenden; den Webserver nicht direkt per Portweiterleitung ins Internet freigeben.
 
 Die API liefert JSON mit Temperatur, Luftfeuchtigkeit, Bewegungsstatus, Ampelfarbe, Laufzeit und IP-Adresse. Ungültige Sensorwerte werden als `null` ausgegeben.
 
@@ -58,13 +48,15 @@ Die API liefert JSON mit Temperatur, Luftfeuchtigkeit, Bewegungsstatus, Ampelfar
 
 Der ESP32 kann nicht direkt in einen Windows-Ordner schreiben. `tools/log_sensor_data.py` läuft deshalb auf dem PC, fragt den ESP32 alle 30 Sekunden ab und legt `sensordaten.db` im Projekt-Hauptordner an. Die Datenbank ist SQLite; Python 3 wird benötigt, zusätzliche Python-Pakete nicht.
 
-1. PC mit dem WLAN `Ampel-Sensor` verbinden und Verbindung ohne Internetzugang beibehalten.
-2. Im Projektordner ein Terminal öffnen.
-3. Logger starten:
+1. PC mit demselben Heim-WLAN wie den ESP32 verbinden.
+2. Die IP-Adresse aus dem seriellen Monitor übernehmen.
+3. Im Projektordner ein Terminal öffnen und den Logger mit dieser Adresse starten:
 
 ```powershell
-python tools\log_sensor_data.py
+python tools\log_sensor_data.py --url http://192.168.1.123/api/status
 ```
+
+Dabei `192.168.1.123` durch die tatsächliche ESP32-IP ersetzen.
 
 Der Logger speichert Zeitstempel, Temperatur, Luftfeuchtigkeit, Bewegung, Ampelfarbe und ESP32-Laufzeit in Tabelle `sensor_readings`. Bei ungültigen DHT22-Werten werden Temperatur und Luftfeuchtigkeit als SQL-`NULL` gespeichert. Logger mit `Ctrl+C` beenden. Während er läuft, muss der PC mit dem ESP32-Zugangspunkt verbunden bleiben.
 
@@ -100,7 +92,7 @@ Der serielle Monitor verwendet 115200 Baud. Nach dem Start meldet er WLAN-Name u
 | `src/main.cpp` | Initialisierung und Hauptschleife |
 | `src/sensors.cpp` | PIR- und DHT22-Zugriff |
 | `src/traffic_light.cpp` | Ampelausgänge und zeitgesteuerte Zustandslogik |
-| `src/webserver.cpp` | Access Point, Webseite und Status-API |
+| `src/webserver.cpp` | WLAN-Verbindung, Webseite und Status-API |
 | `include/config.h` | GPIOs und WLAN-Zugangsdaten |
 | `data/index.html` | Lokale Statusseite |
 | `tools/log_sensor_data.py` | PC-Logger für SQLite-Aufzeichnung |

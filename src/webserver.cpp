@@ -51,7 +51,7 @@ void handleStatus() {
     json += "\",\"uptimeSeconds\":";
     json += String(millis() / 1000UL);
     json += ",\"ip\":\"";
-    json += WiFi.softAPIP().toString();
+    json += WiFi.localIP().toString();
     json += "\"}";
 
     server.sendHeader("Cache-Control", "no-store");
@@ -65,9 +65,20 @@ void webServerInit() {
         Serial.println("LittleFS nicht bereit; Webdateien nicht verfuegbar.");
     }
 
-    WiFi.mode(WIFI_AP);
-    if (!WiFi.softAP(ACCESS_POINT_SSID, ACCESS_POINT_PASSWORD)) {
-        Serial.println("Access Point konnte nicht gestartet werden.");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    Serial.print("Verbinde mit WLAN");
+    const uint32_t connectionStartedAt = millis();
+    while (WiFi.status() != WL_CONNECTED &&
+           millis() - connectionStartedAt < 30000UL) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println();
+
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WLAN-Verbindung fehlgeschlagen. SSID und Passwort pruefen.");
         return;
     }
 
@@ -79,10 +90,10 @@ void webServerInit() {
     server.begin();
     serverStarted = true;
 
-    Serial.print("Access Point: ");
-    Serial.println(ACCESS_POINT_SSID);
+    Serial.print("Verbunden mit WLAN: ");
+    Serial.println(WiFi.SSID());
     Serial.print("Webseite: http://");
-    Serial.println(WiFi.softAPIP());
+    Serial.println(WiFi.localIP());
 }
 
 void webServerHandleClient() {

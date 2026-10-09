@@ -13,9 +13,6 @@ from urllib.request import urlopen
 
 PROJECT_DIRECTORY = Path(__file__).resolve().parent.parent
 DEFAULT_DATABASE = PROJECT_DIRECTORY / "sensordaten.db"
-DEFAULT_STATUS_URL = "http://192.168.4.1/api/status"
-
-
 def initialize_database(connection):
     connection.execute(
         """
@@ -90,7 +87,7 @@ def store_status(connection, status):
 
 def main():
     parser = argparse.ArgumentParser(description="ESP32-Messwerte alle 30 Sekunden lokal speichern.")
-    parser.add_argument("--url", default=DEFAULT_STATUS_URL, help="URL der ESP32-Status-API")
+    parser.add_argument("--url", required=True, help="URL der ESP32-Status-API")
     parser.add_argument("--interval", type=float, default=30, help="Abfrageintervall in Sekunden")
     parser.add_argument(
         "--database",
