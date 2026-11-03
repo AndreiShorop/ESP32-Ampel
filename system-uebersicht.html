@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef3ef">
+  <title>Systemübersicht | ESP32-Bewegungsampel</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17292c;
+      --muted: #647476;
+      --line: #d6dfdb;
+      --paper: #eef3ef;
+      --white: #fff;
+      --teal: #176f65;
+      --teal-dark: #104e49;
+      --teal-pale: #e2f0eb;
+      --red: #c94d43;
+      --red-pale: #f8e8e4;
+      --amber: #bf7a1b;
+      --amber-pale: #fbf0dc;
+      --green: #238263;
+      --green-pale: #e4f2e9;
+      --shadow: 0 16px 38px rgba(23, 41, 44, .07);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image: linear-gradient(rgba(23, 41, 44, .025) 1px, transparent 1px), linear-gradient(90deg, rgba(23, 41, 44, .025) 1px, transparent 1px);
+      background-size: 24px 24px;
+      font: 15px/1.6 Bahnschrift, "Trebuchet MS", sans-serif;
+    }
+    a { color: var(--teal-dark); }
+    button { font: inherit; }
+    .shell { display: grid; grid-template-columns: 252px minmax(0, 1fr); min-height: 100vh; }
+    .rail {
+      position: sticky;
+      top: 0;
+      display: flex;
+      height: 100vh;
+      flex-direction: column;
+      padding: 27px 19px 18px;
+      border-right: 1px solid var(--line);
+      background: rgba(248, 250, 247, .91);
+      backdrop-filter: blur(12px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px 26px; }
+    .brand-mark { display: grid; width: 39px; aspect-ratio: 1; place-items: center; border-radius: 11px 11px 11px 3px; color: white; background: var(--teal-dark); font: bold 18px Georgia, serif; }
+    .brand-title { font: bold 16px Georgia, serif; }
+    .brand-subtitle { color: var(--muted); font-size: 11px; }
+    .nav-label { margin: 7px 10px 8px; color: #788785; font-size: 10px; font-weight: bold; letter-spacing: 1.2px; text-transform: uppercase; }
+    nav { display: grid; gap: 4px; }
+    nav a { display: flex; align-items: center; min-height: 38px; gap: 10px; padding: 7px 10px; border-radius: 5px; color: #435557; font-size: 12px; text-decoration: none; transition: background .18s ease, color .18s ease; }
+    nav a:hover, nav a:focus-visible { color: var(--teal-dark); background: var(--teal-pale); outline: none; }
+    .nav-index { width: 19px; color: #889694; font: 11px Consolas, monospace; }
+    .rail-bottom { margin-top: auto; padding: 14px 9px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+    .rail-bottom a { display: inline-block; margin-top: 7px; font-weight: bold; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    main { min-width: 0; width: min(1190px, 100%); margin: 0 auto; padding: 32px clamp(22px, 4vw, 58px) 72px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 33px; color: var(--muted); font-size: 11px; }
+    .crumb { display: flex; align-items: center; gap: 8px; }
+    .crumb strong { color: var(--ink); font-weight: bold; }
+    .local-tag { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 4px; background: rgba(255,255,255,.62); }
+    .local-tag::before { width: 7px; height: 7px; border-radius: 50%; background: var(--green); content: ""; }
+    .intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 260px); align-items: end; gap: 24px; margin-bottom: 25px; animation: appear .42s ease both; }
+    .eyebrow { margin: 0 0 7px; color: var(--teal); font-size: 10px; font-weight: bold; letter-spacing: 1.4px; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 8px; font: normal clamp(32px, 4vw, 48px)/1.08 Georgia, "Times New Roman", serif; letter-spacing: 0; }
+    .lead { max-width: 660px; margin: 0; color: var(--muted); font-size: 14px; }
+    .project-stamp { justify-self: end; padding: 10px 13px; border-left: 2px solid var(--teal); color: var(--muted); font-size: 11px; }
+    .project-stamp strong { display: block; color: var(--ink); font: bold 13px Georgia, serif; }
+    .section { margin-top: 41px; scroll-margin-top: 20px; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+    .section-kicker { margin-bottom: 4px; color: var(--teal); font: bold 10px Consolas, monospace; letter-spacing: 1px; text-transform: uppercase; }
+    h2 { margin-bottom: 0; font: normal 25px/1.2 Georgia, "Times New Roman", serif; }
+    .section-note { margin: 0; color: var(--muted); font-size: 11px; text-align: right; }
+    .map-panel { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--white); box-shadow: var(--shadow); animation: appear .48s .06s ease both; }
+    .map-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fbfcfa; }
+    .map-caption { color: var(--muted); font-size: 11px; }
+    .segmented { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 5px; background: #f0f4f1; }
+    .segmented button { min-height: 29px; padding: 4px 10px; border: 0; border-radius: 3px; color: var(--muted); background: transparent; cursor: pointer; font-size: 11px; }
+    .segmented button[aria-pressed="true"] { color: white; background: var(--teal-dark); }
+    .segmented button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+    .map-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+    .system-map { display: block; width: 100%; min-width: 780px; height: auto; }
+    .system-map .wire { fill: none; stroke: #91a5a0; stroke-width: 2; marker-end: url(#arrow); }
+    .system-map .wire.teal { stroke: var(--teal); }
+    .system-map .wire.amber { stroke: var(--amber); }
+    .system-map .wire.dashed { stroke-dasharray: 6 6; }
+    .system-map .node { fill: #fff; stroke: #cbd8d3; stroke-width: 1.5; }
+    .system-map .node-main { fill: #edf5f1; stroke: var(--teal); stroke-width: 2; }
+    .system-map .node-cloud { fill: #f6f8f6; stroke: #b6c5c0; stroke-width: 1.5; }
+    .system-map .node-db { fill: #fff4e2; stroke: #d5a656; stroke-width: 1.5; }
+    .system-map .node-title { fill: var(--ink); font: bold 15px Bahnschrift, "Trebuchet MS", sans-serif; }
+    .system-map .node-copy { fill: #617173; font: 11px Bahnschrift, "Trebuchet MS", sans-serif; }
+    .system-map .node-tag { fill: var(--teal); font: bold 9px Consolas, monospace; letter-spacing: .8px; }
+    .system-map .wire-label { fill: #667775; font: 10px Bahnschrift, sans-serif; }
+    .system-map .step { fill: #fff; stroke: #a9bbb5; stroke-width: 1.5; }
+    .system-map .step-number { fill: var(--teal-dark); font: bold 10px Consolas, monospace; text-anchor: middle; dominant-baseline: central; }
+    .diagram-pane[hidden] { display: none; }
+    .map-foot { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); color: var(--muted); background: #fbfcfa; font-size: 11px; }
+    .map-foot strong { color: var(--ink); }
+    .map-foot-mark { color: var(--teal); font-weight: bold; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 14px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,.78); }
+    .metric { padding: 14px 16px; border-right: 1px solid var(--line); }
+    .metric:last-child { border-right: 0; }
+    .metric-value { display: block; color: var(--teal-dark); font: normal 22px/1.15 Georgia, serif; }
+    .metric-label { color: var(--muted); font-size: 10px; }
+    .content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .info-block { min-width: 0; padding: 17px 18px; border-top: 2px solid var(--teal); background: rgba(255,255,255,.86); }
+    .info-block h3 { margin-bottom: 7px; font: bold 15px Georgia, serif; }
+    .info-block p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+    .flow-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; counter-reset: flow; }
+    .flow-list li { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 11px; padding: 0 0 17px; counter-increment: flow; }
+    .flow-list li:not(:last-child)::after { position: absolute; top: 29px; left: 14px; width: 1px; height: calc(100% - 25px); background: var(--line); content: ""; }
+    .flow-list li::before { display: grid; width: 29px; aspect-ratio: 1; place-items: center; border: 1px solid #c9d8d2; border-radius: 50%; color: var(--teal-dark); background: var(--teal-pale); content: counter(flow, decimal-leading-zero); font: 10px Consolas, monospace; }
+    .flow-list strong { display: block; margin: 2px 0 2px; font-size: 12px; }
+    .flow-list span { display: block; color: var(--muted); font-size: 11px; }
+    .state-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .state { position: relative; min-height: 115px; padding: 14px 12px; border: 1px solid var(--line); border-radius: 5px; background: white; }
+    .state:not(:last-child)::after { position: absolute; top: 23px; right: -9px; z-index: 1; width: 16px; height: 1px; background: #9bacaa; content: ""; }
+    .state-name { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 8px; font-weight: bold; font-size: 12px; }
+    .state-dot { width: 9px; aspect-ratio: 1; border-radius: 50%; background: var(--green); }
+    .state.yellow .state-dot { background: #e1a02f; }
+    .state.red .state-dot { background: var(--red); }
+    .state p { margin-bottom: 0; color: var(--muted); font-size: 10px; }
+    .state-trigger { display: block; margin-top: 8px; color: var(--teal); font: 9px Consolas, monospace; }
+    .data-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.9); font-size: 11px; }
+    .data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .data-table th { color: #536365; background: #e9efeb; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
+    .data-table tr:last-child td { border-bottom: 0; }
+    code, pre { font-family: Consolas, "Courier New", monospace; }
+    code { color: #175f56; font-size: .95em; }
+    .endpoint { white-space: nowrap; }
+    .code-card { overflow: hidden; border: 1px solid #2b4444; border-radius: 6px; color: #e7efeb; background: #182d30; }
+    .code-title { display: flex; justify-content: space-between; gap: 12px; padding: 9px 13px; border-bottom: 1px solid rgba(255,255,255,.12); color: #afc0bb; font-size: 10px; }
+    pre { overflow-x: auto; margin: 0; padding: 15px; color: #dce8e2; font-size: 11px; line-height: 1.7; }
+    .code-key { color: #8ed3b8; }
+    .code-value { color: #f3c678; }
+    .paths { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(0, 1.3fr); gap: 0; border: 1px solid var(--line); background: white; }
+    .paths div { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 11px; overflow-wrap: anywhere; }
+    .paths div:nth-last-child(-n+2) { border-bottom: 0; }
+    .paths .path-label { color: var(--muted); background: #f5f8f5; }
+    .warning { display: flex; gap: 11px; margin-top: 14px; padding: 13px 15px; border-left: 3px solid var(--amber); color: #71511d; background: var(--amber-pale); font-size: 11px; }
+    .warning strong { color: #543a10; }
+    .check-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    details.check { border: 1px solid var(--line); border-radius: 5px; background: white; }
+    details.check summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 46px; padding: 10px 13px; cursor: pointer; font-size: 11px; font-weight: bold; list-style: none; }
+    details.check summary::-webkit-details-marker { display: none; }
+    details.check summary::after { color: var(--teal); content: "+"; font: 18px Georgia, serif; }
+    details.check[open] summary::after { content: "−"; }
+    details.check p { margin: 0; padding: 0 13px 13px; color: var(--muted); font-size: 11px; }
+    .footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 38px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+    .footer a { text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    @keyframes appear { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 205px minmax(0, 1fr); }
+      .rail { padding-right: 12px; padding-left: 12px; }
+      .intro { grid-template-columns: 1fr; }
+      .project-stamp { justify-self: start; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric:nth-child(2) { border-right: 0; }
+      .metric:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    }
+    @media (max-width: 680px) {
+      .shell { display: block; }
+      .rail { position: relative; width: 100%; height: auto; padding: 12px 16px 10px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .brand { padding: 0 2px 10px; }
+      .brand-mark { width: 33px; }
+      .nav-label, .rail-bottom { display: none; }
+      nav { display: flex; overflow-x: auto; gap: 5px; padding-bottom: 2px; scrollbar-width: thin; }
+      nav a { flex: 0 0 auto; min-height: 32px; padding: 5px 8px; background: rgba(255,255,255,.65); font-size: 10px; }
+      .nav-index { display: none; }
+      main { padding: 19px 16px 48px; }
+      .topline { margin-bottom: 23px; }
+      .local-tag { font-size: 9px; }
+      .section { margin-top: 33px; }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 6px; }
+      .section-note { text-align: left; }
+      .content-grid { grid-template-columns: 1fr; }
+      .state-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .state:nth-child(2)::after { display: none; }
+      .check-grid { grid-template-columns: 1fr; }
+      .footer { flex-direction: column; }
+    }
+    @media (max-width: 430px) {
+      .topline { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .map-toolbar { align-items: flex-start; flex-direction: column; }
+      .segmented { width: 100%; }
+      .segmented button { flex: 1; }
+      .metrics .metric { padding: 11px; }
+      .metric-value { font-size: 19px; }
+      .paths { grid-template-columns: 1fr; }
+      .paths div { border-bottom: 0; }
+      .paths .path-label { padding-bottom: 3px; }
+      .paths .path-value { padding-top: 2px; border-bottom: 1px solid var(--line); }
+      .paths .path-value:last-child { border-bottom: 0; }
+      .data-table { font-size: 10px; }
+      .data-table th, .data-table td { padding: 8px 7px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="Seitennavigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">A</div>
+        <div><div class="brand-title">Ampel-System</div><div class="brand-subtitle">Technische Übersicht</div></div>
+      </div>
+      <div class="nav-label">Inhalt</div>
+      <nav>
+        <a href="#systembild"><span class="nav-index">01</span>Systembild</a>
+        <a href="#ablauf"><span class="nav-index">02</span>Ablauf</a>
+        <a href="#ampellogik"><span class="nav-index">03</span>Ampellogik</a>
+        <a href="#schnittstellen"><span class="nav-index">04</span>API &amp; Daten</a>
+        <a href="#speicherung"><span class="nav-index">05</span>Speicherung</a>
+        <a href="#hardware"><span class="nav-index">06</span>Hardware</a>
+        <a href="#betrieb"><span class="nav-index">07</span>Betrieb</a>
+      </nav>
+      <div class="rail-bottom">Einzeldatei, läuft lokal im Browser.<br><a href="doku.md">Zur Projektdokumentation</a></div>
+    </aside>
+
+    <main>
+      <div class="topline">
+        <div class="crumb"><span>ESP32-Bewegungsampel</span><span aria-hidden="true">/</span><strong>Systemübersicht</strong></div>
+        <span class="local-tag">Lokale technische Doku</span>
+      </div>
+
+      <header class="intro">
+        <div>
+          <p class="eyebrow">Architektur · Datenfluss · Betrieb</p>
+          <h1>Wie das System zusammenspielt</h1>
+          <p class="lead">Sensoren liefern Zustände an den ESP32. Die Firmware steuert daraus die Ampel und stellt Messwerte im lokalen WLAN bereit. PC-Logger und Backup laufen unabhängig davon.</p>
+        </div>
+        <div class="project-stamp"><strong>ESP32 · Arduino · LittleFS</strong>Webserver, SQLite-Logger und PowerShell-Backup</div>
+      </header>
+
+      <section class="section" id="systembild">
+        <div class="section-head">
+          <div><p class="section-kicker">01 / Gesamtbild</p><h2>Ein Controller, drei Datenwege</h2></div>
+          <p class="section-note">Diagramm zeigt reale Software- und Speichergrenzen.</p>
+        </div>
+        <div class="map-panel">
+          <div class="map-toolbar">
+            <span class="map-caption">Wähle eine Ansicht des laufenden Systems.</span>
+            <div class="segmented" role="group" aria-label="Diagrammansicht">
+              <button type="button" data-map="system" aria-pressed="true">Systemübersicht</button>
+              <button type="button" data-map="cycle" aria-pressed="false">Ampelzyklus</button>
+            </div>
+          </div>
+          <div class="diagram-pane" id="map-system">
+            <div class="map-scroll" tabindex="0" aria-label="Systemdiagramm; auf kleinen Bildschirmen horizontal scrollbar">
+              <svg class="system-map" viewBox="0 0 1000 380" role="img" aria-labelledby="map-title map-desc">
+                <title id="map-title">Architektur der ESP32-Bewegungsampel</title>
+                <desc id="map-desc">PIR und DHT22 liefern Eingaben an den ESP32. Dieser steuert die Ampel, bedient die Webseite und liefert Statusdaten an den PC-Logger. Der Logger schreibt die SQLite-Datei; ein PowerShell-Skript kopiert sie ins Backup.</desc>
+                <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#91a5a0"/></marker></defs>
+                <path class="wire" d="M210 114 H324"/><path class="wire" d="M210 258 H324"/>
+                <path class="wire teal" d="M560 124 H686"/><path class="wire teal" d="M560 251 C615 251 627 201 686 201"/>
+                <path class="wire amber" d="M794 245 V292"/><path class="wire amber dashed" d="M845 322 H896"/>
+                <circle class="step" cx="267" cy="114" r="13"/><text class="step-number" x="267" y="114">1</text>
+                <circle class="step" cx="267" cy="258" r="13"/><text class="step-number" x="267" y="258">2</text>
+                <circle class="step" cx="624" cy="124" r="13"/><text class="step-number" x="624" y="124">3</text>
+                <circle class="step" cx="625" cy="225" r="13"/><text class="step-number" x="625" y="225">4</text>
+                <circle class="step" cx="794" cy="272" r="13"/><text class="step-number" x="794" y="272">5</text>
+                <rect class="node" x="34" y="77" width="176" height="74" rx="8"/>
+                <text class="node-tag" x="51" y="99">EINGANG · GPIO 33</text><text class="node-title" x="51" y="121">PIR-Bewegung</text><text class="node-copy" x="51" y="138">HIGH meldet Bewegung</text>
+                <rect class="node" x="34" y="221" width="176" height="74" rx="8"/>
+                <text class="node-tag" x="51" y="243">EINGANG · GPIO 4</text><text class="node-title" x="51" y="265">AM2302 / DHT22</text><text class="node-copy" x="51" y="282">Temperatur + Feuchte</text>
+                <rect class="node-main" x="324" y="76" width="236" height="218" rx="12"/>
+                <text class="node-tag" x="348" y="105">STEUERUNG</text><text class="node-title" x="348" y="132" style="font: bold 23px Georgia,serif">ESP32</text>
+                <text class="node-copy" x="348" y="162">Arduino-Hauptschleife</text><text class="node-copy" x="348" y="182">Zustandsautomat Ampel</text><text class="node-copy" x="348" y="202">HTTP-Server · Port 80</text><text class="node-copy" x="348" y="222">Status-API · /api/status</text><text class="node-copy" x="348" y="256">Webseite aus LittleFS</text><text class="node-tag" x="348" y="277">WLAN-CLIENT · 2,4 GHz</text>
+                <rect class="node" x="686" y="88" width="278" height="72" rx="8"/>
+                <text class="node-tag" x="705" y="110">AUSGANG · GPIO 25 / 26 / 27</text><text class="node-title" x="705" y="133">Rot · Gelb · Grün</text><text class="node-copy" x="705" y="149">Gelbphase je zwei Sekunden</text>
+                <rect class="node-cloud" x="686" y="173" width="216" height="72" rx="8"/>
+                <text class="node-tag" x="705" y="195">BROWSER IM SELBEN WLAN</text><text class="node-title" x="705" y="218">Live-Webseite</text><text class="node-copy" x="705" y="234">ruft API alle 1,5 s ab</text>
+                <rect class="node-cloud" x="686" y="292" width="159" height="62" rx="8"/>
+                <text class="node-tag" x="704" y="313">PC · PYTHON</text><text class="node-title" x="704" y="334">Logger · 30 s</text>
+                <path class="node-db" d="M896 299 Q930 283 964 299 V348 Q930 364 896 348 Z"/><ellipse cx="930" cy="299" rx="34" ry="10" fill="#fff4e2" stroke="#d5a656" stroke-width="1.5"/><path d="M896 324 Q930 340 964 324" fill="none" stroke="#d5a656" stroke-width="1.5"/>
+                <text class="node-tag" x="907" y="319">SQLITE</text><text class="node-title" x="907" y="339" style="font-size:11px">sensordaten.db</text>
+                <text class="wire-label" x="573" y="110">Lichtzustand</text><text class="wire-label" x="580" y="249">HTTP + JSON</text><text class="wire-label" x="805" y="282">DB-Datei</text>
+              </svg>
+            </div>
+            <div class="map-foot"><span class="map-foot-mark">!</span><span><strong>Wichtig:</strong> Der ESP32 schreibt nicht direkt in die Datenbank. Der PC fragt die API ab und speichert die Antworten lokal; das Backup-Skript kopiert nur die SQLite-Datei.</span></div>
+          </div>
+          <div class="diagram-pane" id="map-cycle" hidden>
+            <div class="map-scroll" tabindex="0" aria-label="Ampelzyklus; auf kleinen Bildschirmen horizontal scrollbar">
+              <svg class="system-map" viewBox="0 0 1000 330" role="img" aria-labelledby="cycle-title cycle-desc">
+                <title id="cycle-title">Zustandswechsel der Ampel</title>
+                <desc id="cycle-desc">Grün wechselt bei Bewegung über zwei Sekunden Gelb zu Rot. Rot bleibt bei Bewegung aktiv. Sobald keine Bewegung mehr erkannt wird, folgt zwei Sekunden Gelb und danach Grün.</desc>
+                <defs><marker id="arrow-cycle" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#91a5a0"/></marker></defs>
+                <path d="M260 110 H385" fill="none" stroke="#91a5a0" stroke-width="2" marker-end="url(#arrow-cycle)"/><path d="M615 110 H740" fill="none" stroke="#91a5a0" stroke-width="2" marker-end="url(#arrow-cycle)"/>
+                <path d="M850 160 C850 260 150 260 150 160" fill="none" stroke="#91a5a0" stroke-width="2" marker-end="url(#arrow-cycle)"/>
+                <rect class="node" x="40" y="68" width="220" height="98" rx="10"/><circle cx="70" cy="99" r="9" fill="#258d68"/><text class="node-tag" x="92" y="103">ZUSTAND 1</text><text class="node-title" x="62" y="132">Grün</text><text class="node-copy" x="62" y="151">Warten auf Bewegung</text>
+                <rect class="node" x="390" y="68" width="220" height="98" rx="10" style="fill:#fff6e6;stroke:#d5a656"/><circle cx="420" cy="99" r="9" fill="#e1a02f"/><text class="node-tag" x="442" y="103" style="fill:#a86a13">ÜBERGANG · 2 s</text><text class="node-title" x="412" y="132">Gelb</text><text class="node-copy" x="412" y="151">Bewegung erkannt</text>
+                <rect class="node" x="740" y="68" width="220" height="98" rx="10" style="fill:#fff0ed;stroke:#d99a92"/><circle cx="770" cy="99" r="9" fill="#c94d43"/><text class="node-tag" x="792" y="103" style="fill:#b23e35">ZUSTAND 3</text><text class="node-title" x="762" y="132">Rot</text><text class="node-copy" x="762" y="151">Bleibt bei Bewegung aktiv</text>
+                <text class="wire-label" x="297" y="95">PIR = HIGH</text><text class="wire-label" x="651" y="95">nach 2 Sekunden</text><text class="wire-label" x="432" y="247">PIR = LOW · dann 2 Sekunden Gelb zurück zu Grün</text>
+              </svg>
+            </div>
+            <div class="map-foot"><span class="map-foot-mark">i</span><span>Die Ampellogik ist nicht blockierend: Die Hauptschleife prüft Sensor und Webanfragen fortlaufend, statt während der Gelbphase zu warten.</span></div>
+          </div>
+        </div>
+        <div class="metrics" aria-label="Aktualisierungsintervalle">
+          <div class="metric"><span class="metric-value">2,5 s</span><span class="metric-label">Sensoren lesen</span></div>
+          <div class="metric"><span class="metric-value">1,5 s</span><span class="metric-label">Webseite aktualisieren</span></div>
+          <div class="metric"><span class="metric-value">30 s</span><span class="metric-label">Logger fragt API ab</span></div>
+          <div class="metric"><span class="metric-value">60 s</span><span class="metric-label">Backup wiederholen</span></div>
+        </div>
+      </section>
+
+      <section class="section" id="ablauf">
+        <div class="section-head"><div><p class="section-kicker">02 / Datenfluss</p><h2>Was beim Start und im Betrieb passiert</h2></div></div>
+        <ol class="flow-list">
+          <li><div><strong>Firmware startet</strong><span>Initialisiert Sensoren und Ampelausgänge, danach LittleFS und WLAN-Verbindung.</span></div></li>
+          <li><div><strong>ESP32 tritt dem 2,4-GHz-WLAN bei</strong><span>SSID und Passwort kommen aus <code>include/config.h</code>. Nach Verbindung startet der HTTP-Server auf Port 80.</span></div></li>
+          <li><div><strong>Sensorwerte werden aktualisiert</strong><span>DHT22 wird etwa alle 2,5 Sekunden gelesen. Der PIR-Zustand wird in jeder Schleifenrunde geprüft.</span></div></li>
+          <li><div><strong>Webseite erhält Status</strong><span>Der Browser lädt HTML aus LittleFS und fragt <code>/api/status</code> alle 1,5 Sekunden ab.</span></div></li>
+          <li><div><strong>PC protokolliert separat</strong><span>Python fragt denselben JSON-Endpunkt alle 30 Sekunden ab und fügt eine Zeile in SQLite ein.</span></div></li>
+          <li><div><strong>Backup erstellt lokale Kopie</strong><span>PowerShell kopiert die Datenbankdatei sofort und danach jede Minute. Backup ersetzt jeweils die vorherige Kopie.</span></div></li>
+        </ol>
+      </section>
+
+      <section class="section" id="ampellogik">
+        <div class="section-head"><div><p class="section-kicker">03 / Steuerung</p><h2>Ampel als Zustandsautomat</h2></div><p class="section-note">Alle Zeiten werden mit <code>millis()</code> überwacht.</p></div>
+        <div class="state-row">
+          <article class="state"><div class="state-name"><span class="state-dot"></span>Grün</div><p>Normalzustand, solange keine Bewegung erkannt wird.</p><span class="state-trigger">PIR HIGH → Gelb</span></article>
+          <article class="state yellow"><div class="state-name"><span class="state-dot"></span>Gelb</div><p>Übergang zur roten Ampel, fest zwei Sekunden.</p><span class="state-trigger">2 s → Rot</span></article>
+          <article class="state red"><div class="state-name"><span class="state-dot"></span>Rot</div><p>Bleibt aktiv, solange der PIR Bewegung meldet.</p><span class="state-trigger">PIR LOW → Gelb</span></article>
+          <article class="state yellow"><div class="state-name"><span class="state-dot"></span>Gelb</div><p>Übergang zurück zum Normalzustand, fest zwei Sekunden.</p><span class="state-trigger">2 s → Grün</span></article>
+        </div>
+      </section>
+
+      <section class="section" id="schnittstellen">
+        <div class="section-head"><div><p class="section-kicker">04 / HTTP-Vertrag</p><h2>Webseite und API</h2></div><p class="section-note">Geräte müssen im selben WLAN sein.</p></div>
+        <div class="content-grid">
+          <div>
+            <table class="data-table">
+              <thead><tr><th>Methode</th><th>Pfad</th><th>Ergebnis</th></tr></thead>
+              <tbody>
+                <tr><td>GET</td><td class="endpoint"><code>/</code></td><td>Webseite aus LittleFS</td></tr>
+                <tr><td>GET</td><td class="endpoint"><code>/api/status</code></td><td>JSON mit Livezustand</td></tr>
+                <tr><td>sonstige</td><td class="endpoint"><code>*</code></td><td>HTTP 404</td></tr>
+              </tbody>
+            </table>
+            <div class="warning"><span aria-hidden="true">!</span><span><strong>Netzwerk:</strong> IP-Adresse steht nach WLAN-Verbindung im seriellen Monitor bei 115200 Baud. Für Zugriff mit iPhone-Hotspot muss auch der PC in diesem Hotspot-WLAN sein.</span></div>
+          </div>
+          <div class="code-card">
+            <div class="code-title"><span>Beispielantwort</span><span>application/json</span></div>
+            <pre>{
+  <span class="code-key">"temperatureC"</span>: <span class="code-value">22.8</span>,
+  <span class="code-key">"humidityPercent"</span>: <span class="code-value">46.1</span>,
+  <span class="code-key">"readingsValid"</span>: <span class="code-value">true</span>,
+  <span class="code-key">"motionDetected"</span>: <span class="code-value">false</span>,
+  <span class="code-key">"trafficLight"</span>: <span class="code-value">"green"</span>,
+  <span class="code-key">"uptimeSeconds"</span>: <span class="code-value">125</span>,
+  <span class="code-key">"ip"</span>: <span class="code-value">"172.20.10.5"</span>
+}</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="speicherung">
+        <div class="section-head"><div><p class="section-kicker">05 / Persistenz</p><h2>Messwerte und Sicherung</h2></div></div>
+        <div class="content-grid">
+          <div class="info-block"><h3>SQLite auf dem PC</h3><p>Logger schreibt in <code>db\sensordaten.db</code>, typischerweise alle 30 Sekunden. Ungültige Temperatur- und Feuchtewerte werden als SQL-NULL abgelegt. Die Datenbank entsteht beim Loggerstart.</p></div>
+          <div class="info-block"><h3>Rotierendes Backup</h3><p><code>BackupService\backup.ps1</code> erstellt <code>C:\vscode\ESP32-Ampel\BackupService\Backup\sensordaten_backup.db</code>. Jede Sicherung ersetzt die vorherige; es entsteht kein Archiv pro Tag.</p></div>
+        </div>
+        <div class="paths" style="margin-top:12px">
+          <div class="path-label">Messdaten</div><div class="path-value"><code>C:\vscode\ESP32-Ampel\db\sensordaten.db</code></div>
+          <div class="path-label">Backup-Kopie</div><div class="path-value"><code>C:\vscode\ESP32-Ampel\BackupService\Backup\sensordaten_backup.db</code></div>
+          <div class="path-label">Erfolgslog</div><div class="path-value"><code>BackupService\Logs\Success\success.log</code></div>
+          <div class="path-label">Fehlerlog</div><div class="path-value"><code>BackupService\Logs\Error\error.log</code></div>
+        </div>
+        <div class="warning"><span aria-hidden="true">!</span><span>Backup läuft nur, wenn <code>backup.ps1</code> aktiv ist. Logger und Backup sind zwei getrennte Prozesse. Stoppen mit <code>Ctrl+C</code> im jeweiligen Terminal.</span></div>
+      </section>
+
+      <section class="section" id="hardware">
+        <div class="section-head"><div><p class="section-kicker">06 / Verdrahtung</p><h2>Pinbelegung und Grenzen</h2></div></div>
+        <table class="data-table">
+          <thead><tr><th>Bauteil</th><th>Signal / Versorgung</th><th>ESP32</th><th>Hinweis</th></tr></thead>
+          <tbody>
+            <tr><td>PIR</td><td>OUT</td><td><code>GPIO 33</code></td><td>Ausgang darf maximal 3,3 V liefern.</td></tr>
+            <tr><td>AM2302 / DHT22</td><td>DATA</td><td><code>GPIO 4</code></td><td>Nackter Sensor benötigt Pull-up 4,7–10 kΩ zu 3V3.</td></tr>
+            <tr><td>Ampel</td><td>Rot / Gelb / Grün</td><td><code>GPIO 25 / 26 / 27</code></td><td>Gemeinsame Masse; Strombedarf beachten.</td></tr>
+            <tr><td>Sensoren</td><td>VCC / GND</td><td><code>3V3 / GND</code></td><td>Alle Bauteile brauchen gemeinsame Masse.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="betrieb">
+        <div class="section-head"><div><p class="section-kicker">07 / Start &amp; Diagnose</p><h2>Betrieb und häufige Fehler</h2></div></div>
+        <div class="content-grid">
+          <div class="info-block">
+            <h3>Messwert-Logger starten</h3>
+            <p>Im Projektordner PowerShell öffnen. IP durch die Adresse aus dem Monitor ersetzen.</p>
+            <div class="code-card" style="margin-top:12px"><pre>python tools\log_sensor_data.py --url http://&lt;ESP32-IP&gt;/api/status --database "db\sensordaten.db"</pre></div>
+            <p style="margin-top:10px">Mit <code>Ctrl+C</code> stoppen. PC muss im selben WLAN wie ESP32 sein.</p>
+          </div>
+          <div class="info-block">
+            <h3>Backup starten</h3>
+            <p>Logger zuerst starten und mindestens eine Messung speichern. In zweitem PowerShell-Terminal:</p>
+            <div class="code-card" style="margin-top:12px"><pre>cd C:\vscode\ESP32-Ampel
+.\BackupService\backup.ps1</pre></div>
+            <p style="margin-top:10px">Mit <code>Ctrl+C</code> stoppen. Falls Richtlinie blockiert: <code>Set-ExecutionPolicy -Scope Process Bypass</code>.</p>
+          </div>
+        </div>
+        <div class="check-grid" style="margin-top:13px">
+          <details class="check"><summary>Webseite lädt nicht</summary><p>Monitor-Ausgabe prüfen. ESP32 und Browser müssen im gleichen WLAN sein. URL mit <code>http://</code> öffnen. Falls LittleFS-Dateien fehlen, <code>pio run --target uploadfs</code> ausführen.</p></details>
+          <details class="check"><summary>WLAN-Verbindung schlägt fehl</summary><p>SSID und Hotspot-Passwort in der lokalen Konfiguration vergleichen. ESP32 braucht 2,4-GHz-WLAN; beim iPhone-Hotspot „Maximale Kompatibilität“ aktivieren.</p></details>
+          <details class="check"><summary>DHT22 zeigt --.-</summary><p>Versorgung, DATA an GPIO 4 und Pull-up-Widerstand prüfen. Code erwartet DHT22/AM2302.</p></details>
+          <details class="check"><summary>Backup schlägt fehl</summary><p>Logger muss DB zuerst anlegen. Dann Fehlerlog unter <code>BackupService\Logs\Error\error.log</code> ansehen und prüfen, ob Quelldatei existiert.</p></details>
+        </div>
+      </section>
+
+      <footer class="footer"><span>Systemübersicht · ESP32-Bewegungsampel</span><span><a href="doku.md">Kurz-Dokumentation öffnen</a> · Offline nutzbar</span></footer>
+    </main>
+  </div>
+  <script>
+    const mapButtons = document.querySelectorAll('[data-map]');
+    mapButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const selected = button.dataset.map;
+        mapButtons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        document.querySelectorAll('.diagram-pane').forEach((pane) => {
+          pane.hidden = pane.id !== `map-${selected}`;
+        });
+      });
+    });
+  </script>
+</body>
+</html>

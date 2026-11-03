@@ -100,6 +100,7 @@ def main():
         parser.error("--interval muss größer als 0 sein.")
 
     database_path = arguments.database.resolve()
+    database_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(database_path)
     initialize_database(connection)
     print("Speichere Daten in:", database_path)

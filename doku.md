@@ -1,10 +1,12 @@
 # ESP32-Bewegungsampel
 
+Interaktive Systemübersicht: [system-uebersicht.html](system-uebersicht.html). Datei direkt im Browser öffnen; Internet oder Webserver nicht erforderlich.
+
 ## Zweck
 
 Das Projekt steuert eine dreifarbige Ampel mit einem PIR-Bewegungssensor. Ein AM2302/DHT22 misst zusätzlich Temperatur und relative Luftfeuchtigkeit. Der ESP32 verbindet sich mit dem Heim-WLAN und zeigt den aktuellen Anlagenstatus auf einer lokalen Webseite an.
 
-Der Zugangspunkt bietet keinen Internetzugang. Der ESP32 stellt Livewerte bereit. Ein optionaler PC-Logger speichert diese regelmäßig in einer SQLite-Datenbank im Projektordner.
+Der Zugangspunkt bietet keinen Internetzugang. Der ESP32 stellt Livewerte bereit. Ein optionaler PC-Logger speichert diese regelmäßig in einer SQLite-Datenbank im Ordner `db`.
 
 ## Hardware und Anschlüsse
 
@@ -34,7 +36,7 @@ Bei einem nackten DHT22-Sensor ist zwischen DATA und 3V3 üblicherweise ein Pull
 - Temperatur und Luftfeuchtigkeit werden etwa alle 2,5 Sekunden ausgelesen.
 - Die Ampelsteuerung blockiert den Programmablauf nicht; Webanfragen werden daher auch während eines Ampelwechsels verarbeitet.
 - Die Webseite fragt den Status alle 1,5 Sekunden über die lokale JSON-API ab.
-- Der PC-Logger schreibt einen Datensatz alle 30 Sekunden in `sensordaten.db` im Projektordner.
+- Der PC-Logger schreibt einen Datensatz alle 30 Sekunden in `db\sensordaten.db`.
 
 ## WLAN und Webseite
 
@@ -46,21 +48,40 @@ Die API liefert JSON mit Temperatur, Luftfeuchtigkeit, Bewegungsstatus, Ampelfar
 
 ## Datenbank auf dem PC
 
-Der ESP32 kann nicht direkt in einen Windows-Ordner schreiben. `tools/log_sensor_data.py` läuft deshalb auf dem PC, fragt den ESP32 alle 30 Sekunden ab und legt `sensordaten.db` im Projekt-Hauptordner an. Die Datenbank ist SQLite; Python 3 wird benötigt, zusätzliche Python-Pakete nicht.
+Der ESP32 kann nicht direkt in einen Windows-Ordner schreiben. `tools/log_sensor_data.py` läuft deshalb auf dem PC und fragt den ESP32 alle 30 Sekunden ab. Die Datenbank ist SQLite; Python 3 wird benötigt, zusätzliche Python-Pakete nicht.
 
 1. PC mit demselben Heim-WLAN wie den ESP32 verbinden.
 2. Die IP-Adresse aus dem seriellen Monitor übernehmen.
-3. Im Projektordner ein Terminal öffnen und den Logger mit dieser Adresse starten:
+3. Im Projektordner ein Terminal öffnen und den Logger mit dieser Adresse starten. Die Datenbank wird im Ordner `db` gespeichert; der Ordner wird bei Bedarf angelegt:
 
 ```powershell
-python tools\log_sensor_data.py --url http://192.168.1.123/api/status
+python tools\log_sensor_data.py --url http://172.20.10.5/api/status --database "db\sensordaten.db"
 ```
 
-Dabei `192.168.1.123` durch die tatsächliche ESP32-IP ersetzen.
+Dabei `172.20.10.5` durch die tatsächliche ESP32-IP ersetzen. Logger mit `Ctrl+C` beenden. Während er läuft, muss der PC mit demselben WLAN wie der ESP32 verbunden bleiben.
 
 Der Logger speichert Zeitstempel, Temperatur, Luftfeuchtigkeit, Bewegung, Ampelfarbe und ESP32-Laufzeit in Tabelle `sensor_readings`. Bei ungültigen DHT22-Werten werden Temperatur und Luftfeuchtigkeit als SQL-`NULL` gespeichert. Logger mit `Ctrl+C` beenden. Während er läuft, muss der PC mit dem ESP32-Zugangspunkt verbunden bleiben.
 
-Die Weboberfläche zeigt weiterhin Livewerte, schreibt selbst aber nicht in die Datenbank. Die Datenbankdatei erscheint erst beim ersten Start des Loggers. Sie bleibt im Projekt-Hauptordner erhalten, auch nachdem der Logger beendet wurde.
+Die Weboberfläche zeigt weiterhin Livewerte, schreibt selbst aber nicht in die Datenbank. Die Datenbankdatei `db\sensordaten.db` erscheint beim ersten Start des Loggers und bleibt nach dessen Ende erhalten.
+
+## Datenbank-Backup
+
+`BackupService\backup.ps1` kopiert `db\sensordaten.db` sofort beim Start und danach alle 60 Sekunden. Die Sicherung hat abweichenden Namen `sensordaten_backup.db` und liegt unter `C:\vscode\ESP32-Ampel\BackupService\Backup\sensordaten_backup.db`. Das Skript legt benötigte Ordner automatisch an. Erfolgs- und Fehlermeldungen stehen in `BackupService\Logs\Success\success.log` und `BackupService\Logs\Error\error.log`.
+
+Logger zuerst starten und mindestens einen Datensatz speichern lassen. Dann im Projektordner ein zweites PowerShell-Terminal öffnen und das Backup starten:
+
+```powershell
+.\BackupService\backup.ps1
+```
+
+Falls PowerShell die Skriptausführung blockiert, gilt die Freigabe nur für dieses Terminal:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\BackupService\backup.ps1
+```
+
+Mit `Ctrl+C` beendest du das Backup-Skript. Das laufende Logger-Terminal bleibt davon unberührt.
 
 Die letzten 20 Datensätze lassen sich beispielsweise mit DB Browser for SQLite oder folgender SQL-Abfrage anzeigen:
 
@@ -96,7 +117,8 @@ Der serielle Monitor verwendet 115200 Baud. Nach dem Start meldet er WLAN-Name u
 | `include/config.h` | GPIOs und WLAN-Zugangsdaten |
 | `data/index.html` | Lokale Statusseite |
 | `tools/log_sensor_data.py` | PC-Logger für SQLite-Aufzeichnung |
-| `sensordaten.db` | Vom Logger erzeugte SQLite-Datenbank im Projekt-Hauptordner |
+| `db\sensordaten.db` | Vom Logger erzeugte SQLite-Datenbank |
+| `BackupService\Backup\sensordaten_backup.db` | Letzte Sicherung der Datenbank |
 
 ## Fehlerbehebung
 
@@ -104,9 +126,11 @@ Der serielle Monitor verwendet 115200 Baud. Nach dem Start meldet er WLAN-Name u
 | --- | --- |
 | Webseite nicht erreichbar | Richtiges WLAN verwenden, `http://` statt `https://` öffnen und serielle Ausgabe auf gestarteten Access Point prüfen. |
 | Webseite meldet fehlende Dateien | `pio run --target uploadfs` erneut ausführen. |
-| `sensordaten.db` wird nicht angelegt | PC mit `Ampel-Sensor` verbinden und `python tools\log_sensor_data.py` starten. |
-| Keine neuen Datenbankeinträge | Logger-Terminal auf Verbindungsfehler prüfen; PC muss mit `Ampel-Sensor` verbunden bleiben. |
+| `db\sensordaten.db` wird nicht angelegt | Logger mit gültiger API-Adresse und `--database "db\sensordaten.db"` starten. |
+| Keine neuen Datenbankeinträge | Logger-Terminal auf Verbindungsfehler prüfen; PC muss mit demselben WLAN wie der ESP32 verbunden bleiben. |
 | Sensorwerte werden als `--.-` angezeigt | DHT22-Versorgung, DATA an GPIO 4 und erforderlichen Pull-up prüfen. |
 | Bewegung wird dauerhaft erkannt | PIR-Ausgang, gemeinsame Masse und Sensor-Empfindlichkeit prüfen. |
 | Ampel schaltet nicht | GPIO-Zuordnung und gemeinsame Masse prüfen; Ampel nicht direkt aus einem ESP32-GPIO versorgen, wenn sie mehr Strom benötigt. |
 | Kein serieller Text | Monitor auf 115200 Baud stellen und den richtigen COM-Port öffnen. |
+
+
